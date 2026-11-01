@@ -1,6 +1,7 @@
 use crate::error::Result;
 use std::collections::BTreeMap;
 use std::fs;
+use std::ops::{Bound, RangeBounds};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
@@ -21,6 +22,21 @@ impl StoreOptions {
     pub fn memtable_size(mut self, bytes: usize) -> Self {
         self.memtable_size = bytes;
         self
+    }
+}
+
+pub struct SliceRange<'a>{
+    start: Bound<&'a [u8]>,
+    end: Bound<&'a [u8]>
+}
+
+impl<'a> RangeBounds<[u8]> for SliceRange<'a>{
+    fn start_bound(&self) -> Bound<&[u8]>{
+        self.start
+    }
+
+    fn end_bound(&self) -> Bound<&[u8]>{
+        self.end
     }
 }
 
@@ -45,6 +61,14 @@ impl Store {
 
     pub fn get(&mut self, key: &[u8]) -> Result<bool> {
         Ok(self.map.remove(key).is_some())
+    }
+
+    pub fn scan<'a>(
+        &'a self,
+        start: Bound<&'a [u8]>,
+        end: Bound<&'a [u8]>,
+    ) -> impl Iterator<Item = (&'a [u8], &'a [u8])> + 'a{
+        self.map.range(SliceRange{start, end}).map(|(k, v)| (k.as_slice(), v.as_slice()))
     }
 
     pub fn len(&self) -> usize {
